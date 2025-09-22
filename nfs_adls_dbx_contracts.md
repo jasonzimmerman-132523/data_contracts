@@ -4,99 +4,75 @@
 flowchart LR
   %% === On-Premises ===
   subgraph ONPREM["On-Premises"]
-    direction TB
-    NFS["NFS File Share\n(e.g. /exports/data)"]
-    EDGE["Edge Sync VM\n(Data Box Gateway / Azure File Sync / AzCopy)"]
+    NFS["NFS File Share"]
+    EDGE["Edge Sync VM\n(Data Box Gateway / AzCopy)"]
   end
 
   %% === Azure Storage & Services ===
   subgraph AZURE["Azure Cloud"]
-    direction TB
-    ADLS["ADLS Gen2 Storage Account\n(container: <dataset>)"]
-    IN["Landing zone\n/container/incoming/"]
-    VAL["Validated zone\n/container/validated/"]
-    REJ["Quarantine / Rejected\n/container/rejected/"]
-    EVG["Event Grid\n(blob created)"]
-    TRG["Trigger\n(Azure Function / Logic App)\nstarts Databricks Job"]
-    KV["Key Vault\n(secrets: SP creds, tokens)"]
-    PUR["Data Catalog\n(Microsoft Purview)"]
-    LOG["Monitoring\n(Log Analytics / Monitor)"]
+    ADLS["ADLS Gen2 Storage Account"]
+    IN["Landing zone (/incoming)"]
+    VAL["Validated zone (/validated)"]
+    REJ["Rejected zone (/rejected)"]
+    EVG["Event Grid (blob created)"]
+    TRG["Trigger (Function / Logic App)\nstarts Databricks Job"]
+    KV["Key Vault (secrets)"]
+    PUR["Data Catalog (Purview)"]
+    LOG["Monitoring (Log Analytics)"]
   end
 
   %% === Databricks ===
-  subgraph DATABRICKS["Databricks Workspace / Control Plane"]
-    direction TB
-    REPO["Repo (contract.yaml)\n(GitHub / Azure Repos)"]
-    JOB["Databricks Job\n(job cluster or serverless)"]
-    NB["Validation Notebook\n(Great Expectations / Pandera)"]
-    DLT["Delta Live Tables\n(optional)"]
-    DELTA["Delta Lake\n(/mnt/adls/validated/<dataset>)"]
+  subgraph DATABRICKS["Databricks"]
+    REPO["Repo (contract.yaml)"]
+    JOB["Databricks Job"]
+    NB["Validation Notebook"]
+    DLT["Delta Live Tables (optional)"]
+    DELTA["Delta Lake (/validated dataset)"]
   end
 
-  %% === CI/CD & Governance ===
+  %% === Governance ===
   subgraph CICD["CI/CD & Governance"]
-    direction TB
-    GH["GitHub Actions\n(contract lint + tests)"]
-    PR["Pull Requests & Reviews"]
-    RBAC["AAD / RBAC\n(service principals & groups)"]
+    GH["GitHub Actions"]
+    PR["Pull Requests"]
+    RBAC["AAD / RBAC"]
   end
 
   %% === Consumers ===
   subgraph CONSUMERS["Downstream Consumers"]
-    direction TB
-    BI["BI / Reporting\n(Power BI, Notebooks)"]
-    ML["ML Training / Features\n(model training)"]
+    BI["BI / Reporting (Power BI)"]
+    ML["ML / Training Data"]
   end
 
   %% === Connections ===
-  NFS --> EDGE
-  EDGE -->|azcopy / synctool| IN
-
+  NFS --> EDGE --> IN
   IN --> ADLS
-  ADLS --> IN
-  ADLS --> VAL
-  ADLS --> REJ
+  IN --> EVG --> TRG --> JOB
 
-  IN --> EVG
-  EVG --> TRG
-  TRG --> JOB
-
-  %% Databricks execution and contract
   REPO --> NB
   JOB --> NB
-  NB -->|uses secrets| KV
-  NB -->|validate: PASS| VAL
-  NB -->|validate: FAIL| REJ
+  NB -->|pass| VAL
+  NB -->|fail| REJ
   NB --> DELTA
-  DLT --> DELTA
-  JOB --> DLT
+  JOB --> DLT --> DELTA
+  NB --> KV
 
-  %% Governance & CI/CD
   GH --> REPO
   PR --> REPO
-  REPO -.->|deploy contracts / notebooks| JOB
   RBAC --> DATABRICKS
 
-  %% Observability & Catalog
   DELTA --> PUR
   NB --> LOG
   DELTA --> LOG
 
-  %% Consumers
   DELTA --> BI
   DELTA --> ML
 
-  %% Optional / informative links (dashed)
-  EDGE -.->|optional direct mount (not recommended)| DATABRICKS
-  TRG -.-> NB
-
   %% === LEGEND ===
   subgraph LEGEND["Legend"]
-    direction TB
-    L1["📂 Storage Zones:\nLanding, Validated, Rejected"]
-    L2["⚙️ Processing:\nDatabricks Jobs, Notebooks, DLT"]
-    L3["📜 Contracts:\nYAML (schema + rules) in Git Repo"]
-    L4["🔑 Security:\nAAD RBAC, Key Vault secrets"]
-    L5["📡 Integration:\nEvent Grid + Triggers"]
-    L6["📊 Consumers:\nBI, ML, Data Catalog"]
+    A["Storage Zones: Landing, Validated, Rejected"]
+    B["Processing: Databricks Jobs, Notebooks, DLT"]
+    C["Contracts: YAML in Git Repo"]
+    D["Security: AAD RBAC, Key Vault"]
+    E["Integration: Event Grid + Triggers"]
+    F["Consumers: BI, ML, Catalog"]
   end
