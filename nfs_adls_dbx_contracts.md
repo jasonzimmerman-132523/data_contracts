@@ -67,12 +67,3 @@ flowchart LR
   DELTA --> BI
   DELTA --> ML
 
-  %% === LEGEND ===
-  subgraph LEGEND["Legend"]
-    A["Storage Zones: Landing, Validated, Rejected"]
-    B["Processing: Databricks Jobs, Notebooks, DLT"]
-    C["Contracts: YAML in Git Repo"]
-    D["Security: AAD RBAC, Key Vault"]
-    E["Integration: Event Grid + Triggers"]
-    F["Consumers: BI, ML, Catalog"]
-  end
